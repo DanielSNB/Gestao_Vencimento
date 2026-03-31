@@ -1,11 +1,11 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { 
-  getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc 
+  getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 import { enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-/* CONFIG */
+/* CONFIG FIREBASE */
 const firebaseConfig = {
   apiKey: "SUA_KEY",
   authDomain: "SEU_DOMINIO",
@@ -15,15 +15,15 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-/* 🔥 CACHE OFFLINE (MUITO IMPORTANTE) */
+/* CACHE OFFLINE */
 enableIndexedDbPersistence(db).catch(() => {
   console.log("Cache offline não ativado");
 });
 
 /* ADICIONAR */
 window.adicionar = async function () {
-  const nome = document.getElementById("nome").value;
-  const marca = document.getElementById("marca").value;
+  const nome = document.getElementById("nome").value.trim();
+  const marca = document.getElementById("marca").value.trim();
   const data = document.getElementById("data").value;
   const quantidade = document.getElementById("quantidade").value;
   const gestao = document.getElementById("gestao").value;
@@ -33,18 +33,14 @@ window.adicionar = async function () {
     return;
   }
 
-  try {
-    await addDoc(collection(db, "produtos"), {
-      nome,
-      marca,
-      data,
-      quantidade: Number(quantidade),
-      gestao,
-      criadoEm: new Date()
-    });
-  } catch (e) {
-    alert("Erro ao salvar");
-  }
+  await addDoc(collection(db, "produtos"), {
+    nome,
+    marca,
+    data,
+    quantidade: Number(quantidade),
+    gestao,
+    criadoEm: new Date()
+  });
 
   document.getElementById("nome").value = "";
   document.getElementById("marca").value = "";
@@ -52,12 +48,20 @@ window.adicionar = async function () {
   document.getElementById("quantidade").value = "";
 };
 
-/* EXCLUIR */
-window.excluir = async function (id) {
-  await deleteDoc(doc(db, "produtos", id));
+/* EXCLUIR TODOS DO PRODUTO */
+window.excluirGrupo = async function (nome, marca) {
+  const snapshot = await getDocs(collection(db, "produtos"));
+
+  snapshot.forEach(async (docSnap) => {
+    const item = docSnap.data();
+
+    if (item.nome === nome && item.marca === marca) {
+      await deleteDoc(doc(db, "produtos", docSnap.id));
+    }
+  });
 };
 
-/* COR */
+/* COR VENCIMENTO */
 function calcularClasse(data) {
   const hoje = new Date();
   const venc = new Date(data);
@@ -69,92 +73,99 @@ function calcularClasse(data) {
   return "normal";
 }
 
-/* 🔥 CARREGA AUTOMATICAMENTE AO ABRIR */
-onSnapshot(collection(db, "produtos"), snapshot => {
-  const lista = document.getElementById("lista");
-  const select = document.getElementById("filtroMarca");
-  const filtro = select.value;
+/* LISTAGEM */
+const select = document.getElementById("filtroMarca");
 
-  lista.innerHTML = "";
+select.addEventListener("change", carregar);
 
-  let marcas = new Set();
-  let agrupados = {};
+function carregar() {
+  onSnapshot(collection(db, "produtos"), snapshot => {
+    const lista = document.getElementById("lista");
+    const filtro = select.value;
 
-  snapshot.forEach(docSnap => {
-    const item = docSnap.data();
-    const id = docSnap.id;
+    lista.innerHTML = "";
 
-    if (item.marca) marcas.add(item.marca);
+    let marcas = new Set();
+    let agrupados = {};
 
-    if (filtro && item.marca !== filtro) return;
+    snapshot.forEach(docSnap => {
+      const item = docSnap.data();
 
-    const chave = item.nome + "_" + item.marca;
+      if (item.marca) marcas.add(item.marca);
 
-    if (!agrupados[chave]) {
-      agrupados[chave] = {
-        nome: item.nome,
-        marca: item.marca,
-        gestao: item.gestao,
-        itens: []
-      };
-    }
+      if (filtro && item.marca !== filtro) return;
 
-    agrupados[chave].itens.push({
-      data: item.data,
-      quantidade: item.quantidade,
-      id
+      const chave = item.nome + "_" + item.marca;
+
+      if (!agrupados[chave]) {
+        agrupados[chave] = {
+          nome: item.nome,
+          marca: item.marca,
+          gestao: item.gestao,
+          itens: []
+        };
+      }
+
+      agrupados[chave].itens.push({
+        data: item.data,
+        quantidade: item.quantidade
+      });
     });
-  });
 
-  const valorAtual = select.value;
-  select.innerHTML = '<option value="">Todas as marcas</option>';
+    /* CORRIGIDO: NÃO PERDE MARCAS */
+    const valorAtual = select.value;
+    select.innerHTML = '<option value="">Todas as marcas</option>';
 
-  marcas.forEach(m => {
-    const option = document.createElement("option");
-    option.value = m;
-    option.textContent = m;
-    select.appendChild(option);
-  });
+    marcas.forEach(m => {
+      const option = document.createElement("option");
+      option.value = m;
+      option.textContent = m;
+      select.appendChild(option);
+    });
 
-  select.value = valorAtual;
+    select.value = valorAtual;
 
-  Object.values(agrupados).forEach(produto => {
+    Object.values(agrupados).forEach(produto => {
 
-    produto.itens.sort((a, b) => new Date(a.data) - new Date(b.data));
+      produto.itens.sort((a, b) => new Date(a.data) - new Date(b.data));
 
-    const div = document.createElement("div");
-    div.className = "item";
+      const div = document.createElement("div");
+      div.className = "item";
 
-    let linhasDatas = "";
+      let linhas = "";
 
-    produto.itens.forEach(i => {
-      const classe = calcularClasse(i.data);
+      produto.itens.forEach(i => {
+        const classe = calcularClasse(i.data);
 
-      linhasDatas += `
-        <div class="vencimento ${classe}">
-          ${i.data} → Qtd: ${i.quantidade}
+        linhas += `
+          <div class="vencimento ${classe}">
+            ${i.data} → Qtd: ${i.quantidade}
+          </div>
+        `;
+      });
+
+      div.innerHTML = `
+        <div class="info">
+          <div class="nome">${produto.nome}</div>
+          <div class="marca">Marca: ${produto.marca || "-"}</div>
+
+          <div>
+            Markdown:
+            <strong class="${produto.gestao === 'sim' ? 'sim' : 'nao'}">
+              ${produto.gestao === 'sim' ? 'SIM' : 'NÃO'}
+            </strong>
+          </div>
+
+          ${linhas}
         </div>
+
+        <button class="excluir" onclick="excluirGrupo('${produto.nome}', '${produto.marca}')">X</button>
       `;
+
+      lista.appendChild(div);
     });
-
-    div.innerHTML = `
-      <div class="info">
-        <div class="nome">${produto.nome}</div>
-        <div>Marca: ${produto.marca || "-"}</div>
-
-        <div>
-          Markdown:
-          <strong style="color:${produto.gestao === 'sim' ? 'red' : 'green'}">
-            ${produto.gestao === 'sim' ? 'SIM' : 'NÃO'}
-          </strong>
-        </div>
-
-        ${linhasDatas}
-      </div>
-
-      <button class="excluir" onclick="excluir('${produto.itens[0].id}')">X</button>
-    `;
-
-    lista.appendChild(div);
   });
-});
+}
+
+/* INICIAL */
+carregar();
