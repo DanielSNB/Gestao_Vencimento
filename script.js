@@ -1,6 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+
 import { 
-  getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, getDocs
+  getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, getDocs,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 import { enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -42,7 +44,7 @@ window.adicionar = async function () {
     data,
     quantidade: Number(quantidade),
     gestao,
-    criadoEm: new Date()
+    criadoEm: serverTimestamp()
   });
 
   document.getElementById("nome").value = "";
@@ -72,7 +74,7 @@ window.desfazer = async function () {
 
   await addDoc(collection(db, "produtos"), {
     ...ultimoExcluido,
-    criadoEm: new Date()
+    criadoEm: serverTimestamp()
   });
 
   ultimoExcluido = null;
@@ -216,25 +218,15 @@ function carregar() {
 carregar();
 
 /* ========================= */
-/* ESTOQUE (CORRIGIDO) */
+/* ESTOQUE (AGORA NO FIREBASE) */
 /* ========================= */
 
-window.adicionarEstoque = function () {
+window.adicionarEstoque = async function () {
 
-  const produtoInput = document.getElementById("produtoEstoque");
-  const setorInput = document.getElementById("setor");
-  const fisicoInput = document.getElementById("fisico");
-  const logicoInput = document.getElementById("logico");
-
-  if (!produtoInput || !setorInput || !fisicoInput || !logicoInput) {
-    console.log("Campos de estoque não encontrados");
-    return;
-  }
-
-  const produto = produtoInput.value.trim();
-  const setor = setorInput.value;
-  const fisico = Number(fisicoInput.value);
-  const logico = Number(logicoInput.value);
+  const produto = document.getElementById("produtoEstoque").value.trim();
+  const setor = document.getElementById("setor").value;
+  const fisico = Number(document.getElementById("fisico").value);
+  const logico = Number(document.getElementById("logico").value);
 
   if (!produto || isNaN(fisico) || isNaN(logico)) {
     alert("Preencha todos os campos do estoque");
@@ -243,17 +235,18 @@ window.adicionarEstoque = function () {
 
   const diferenca = fisico - logico;
 
-  const item = { produto, setor, fisico, logico, diferenca };
+  await addDoc(collection(db, "estoqueErro"), {
+    produto,
+    setor,
+    fisico,
+    logico,
+    diferenca,
+    criadoEm: serverTimestamp()
+  });
 
-  const dados = JSON.parse(localStorage.getItem("estoqueErro")) || [];
-  dados.push(item);
-  localStorage.setItem("estoqueErro", JSON.stringify(dados));
-
-  renderEstoque();
-
-  produtoInput.value = "";
-  fisicoInput.value = "";
-  logicoInput.value = "";
+  document.getElementById("produtoEstoque").value = "";
+  document.getElementById("fisico").value = "";
+  document.getElementById("logico").value = "";
 };
 
 function renderEstoque() {
@@ -263,41 +256,43 @@ function renderEstoque() {
 
   if (!sobraDiv || !faltaDiv) return;
 
-  const dados = JSON.parse(localStorage.getItem("estoqueErro")) || [];
+  onSnapshot(collection(db, "estoqueErro"), snapshot => {
 
-  sobraDiv.innerHTML = "";
-  faltaDiv.innerHTML = "";
+    sobraDiv.innerHTML = "";
+    faltaDiv.innerHTML = "";
 
-  dados.forEach((item, index) => {
+    snapshot.forEach((docSnap) => {
 
-    const div = document.createElement("div");
-    div.className = "item estoque-item";
+      const item = docSnap.data();
 
-    div.innerHTML = `
-      <div>
-        <strong>${item.produto}</strong> (${item.setor})<br>
-        Físico: ${item.fisico} | Lógico: ${item.logico}<br>
-        Diferença: ${item.diferenca}
-      </div>
-      <button onclick="removerEstoque(${index})">X</button>
-    `;
+      const div = document.createElement("div");
+      div.className = "item estoque-item";
 
-    if (item.diferenca > 0) {
-      sobraDiv.appendChild(div);
-    } else if (item.diferenca < 0) {
-      faltaDiv.appendChild(div);
-    }
+      div.innerHTML = `
+        <div>
+          <strong>${item.produto}</strong> (${item.setor})<br>
+          Físico: ${item.fisico} | Lógico: ${item.logico}<br>
+          Diferença: ${item.diferenca}
+        </div>
+        <button onclick="removerEstoque('${docSnap.id}')">X</button>
+      `;
+
+      if (item.diferenca > 0) {
+        sobraDiv.appendChild(div);
+      } else if (item.diferenca < 0) {
+        faltaDiv.appendChild(div);
+      }
+
+    });
+
   });
 }
 
-window.removerEstoque = function (index) {
-  const dados = JSON.parse(localStorage.getItem("estoqueErro")) || [];
-  dados.splice(index, 1);
-  localStorage.setItem("estoqueErro", JSON.stringify(dados));
-  renderEstoque();
+window.removerEstoque = async function (id) {
+  await deleteDoc(doc(db, "estoqueErro", id));
 };
 
-/* GARANTE QUE RODA DEPOIS DO HTML */
+/* GARANTE QUE RODA */
 window.addEventListener("load", () => {
   renderEstoque();
 });
