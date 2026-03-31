@@ -2,7 +2,8 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Controle de Vencimentos</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controle de Vencimentos + Estoque</title>
   <link rel="stylesheet" href="style.css">
 </head>
 
@@ -13,8 +14,16 @@
   <h2>📦 Controle de Vencimentos</h2>
 
   <div class="form">
+    
     <input type="text" id="nome" placeholder="Produto">
-    <input type="text" id="marca" placeholder="Marca">
+
+    <!-- 🔥 SETOR (SUBSTITUI MARCA) -->
+    <select id="marca">
+      <option value="suplementos">Suplementos</option>
+      <option value="medicamento">Medicamento</option>
+      <option value="antipulgas">Antipulgas</option>
+    </select>
+
     <input type="date" id="data">
     <input type="number" id="quantidade" placeholder="Quantidade">
 
@@ -28,7 +37,7 @@
 
   <div class="filtro">
     <select id="filtroMarca">
-      <option value="">Todas as marcas</option>
+      <option value="">Todos os setores</option>
     </select>
   </div>
 
@@ -36,11 +45,16 @@
 
 </div>
 
+<!-- ========================= -->
+<!-- ESTOQUE (SEM ALTERAÇÃO) -->
+<!-- ========================= -->
+
 <div class="container estoque">
 
   <h2>📊 Controle de Erro de Estoque</h2>
 
   <div class="form">
+    
     <input type="text" id="produtoEstoque" placeholder="Produto">
 
     <select id="setor">
@@ -56,6 +70,7 @@
   </div>
 
   <div class="listas-estoque">
+    
     <div>
       <h3>🟢 Sobras</h3>
       <div id="listaSobra"></div>
@@ -65,6 +80,7 @@
       <h3>🔴 Faltas</h3>
       <div id="listaFalta"></div>
     </div>
+
   </div>
 
 </div>

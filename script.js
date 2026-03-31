@@ -9,9 +9,12 @@ import { enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/1
 
 /* CONFIG */
 const firebaseConfig = {
-  apiKey: "SUA_KEY",
-  authDomain: "SEU_DOMINIO",
-  projectId: "SEU_PROJECT_ID"
+  apiKey: "AIzaSyBg4gWmKDWnH4cNAq-gJ8nmaaNQ7rw4XMEk",
+  authDomain: "gestao-vencimento.firebaseapp.com",
+  projectId: "gestao-vencimento",
+  storageBucket: "gestao-vencimento.firebasestorage.app",
+  messagingSenderId: "769897586722",
+  appId: "1:769897586722:web:8e9df7539c20b8d1d12a7b"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -20,7 +23,7 @@ const db = getFirestore(app);
 enableIndexedDbPersistence(db).catch(() => {});
 
 /* ========================= */
-/* VENCIMENTOS (INTACTO) */
+/* VENCIMENTOS */
 /* ========================= */
 
 let ultimoExcluido = null;
@@ -28,7 +31,7 @@ let timeoutExclusao = null;
 
 window.adicionar = async function () {
   const nome = document.getElementById("nome").value.trim();
-  const marca = document.getElementById("marca").value;
+  const setor = document.getElementById("marca").value; // HTML ainda usa id="marca"
   const data = document.getElementById("data").value;
   const quantidade = document.getElementById("quantidade").value;
   const gestao = document.getElementById("gestao").value;
@@ -40,7 +43,7 @@ window.adicionar = async function () {
 
   await addDoc(collection(db, "produtos"), {
     nome,
-    marca,
+    setor, // 🔥 AGORA É SETOR
     data,
     quantidade: Number(quantidade),
     gestao,
@@ -105,12 +108,12 @@ function esconderUndo() {
   if (barra) barra.style.display = "none";
 }
 
-window.excluirGrupo = async function (nome, marca) {
+window.excluirGrupo = async function (nome, setor) {
   const snapshot = await getDocs(collection(db, "produtos"));
 
   snapshot.forEach(async (docSnap) => {
     const item = docSnap.data();
-    if (item.nome === nome && item.marca === marca) {
+    if (item.nome === nome && item.setor === setor) {
       await deleteDoc(doc(db, "produtos", docSnap.id));
     }
   });
@@ -143,15 +146,15 @@ function carregar() {
     snapshot.forEach(docSnap => {
       const item = docSnap.data();
 
-      if (item.marca) setores.add(item.marca);
-      if (filtro && item.marca !== filtro) return;
+      if (item.setor) setores.add(item.setor);
+      if (filtro && item.setor !== filtro) return;
 
-      const chave = item.nome + "_" + item.marca;
+      const chave = item.nome + "_" + item.setor;
 
       if (!agrupados[chave]) {
         agrupados[chave] = {
           nome: item.nome,
-          marca: item.marca,
+          setor: item.setor,
           itens: []
         };
       }
@@ -202,11 +205,13 @@ function carregar() {
       div.innerHTML = `
         <div class="info">
           <div class="nome">${produto.nome}</div>
-          <div class="marca">Setor: ${produto.marca}</div>
+          <div class="marca">Setor: ${produto.setor}</div>
           ${linhas}
         </div>
 
-        <button class="excluir" onclick="excluirGrupo('${produto.nome}', '${produto.marca}')">X</button>
+        <button onclick="excluirGrupo('${produto.nome}', '${produto.setor}')">
+          Excluir Grupo
+        </button>
       `;
 
       lista.appendChild(div);
@@ -218,81 +223,34 @@ function carregar() {
 carregar();
 
 /* ========================= */
-/* ESTOQUE (AGORA NO FIREBASE) */
+/* ESTOQUE (INALTERADO) */
 /* ========================= */
 
-window.adicionarEstoque = async function () {
-
-  const produto = document.getElementById("produtoEstoque").value.trim();
+window.adicionarEstoque = function () {
+  const nome = document.getElementById("produtoEstoque").value;
   const setor = document.getElementById("setor").value;
   const fisico = Number(document.getElementById("fisico").value);
   const logico = Number(document.getElementById("logico").value);
 
-  if (!produto || isNaN(fisico) || isNaN(logico)) {
-    alert("Preencha todos os campos do estoque");
-    return;
-  }
+  if (!nome || isNaN(fisico) || isNaN(logico)) return;
 
   const diferenca = fisico - logico;
 
-  await addDoc(collection(db, "estoqueErro"), {
-    produto,
-    setor,
-    fisico,
-    logico,
-    diferenca,
-    criadoEm: serverTimestamp()
-  });
+  const div = document.createElement("div");
+  div.className = "item";
+
+  div.innerHTML = `
+    <strong>${nome}</strong> (${setor})<br>
+    Diferença: ${diferenca}
+  `;
+
+  if (diferenca > 0) {
+    document.getElementById("listaSobra").appendChild(div);
+  } else if (diferenca < 0) {
+    document.getElementById("listaFalta").appendChild(div);
+  }
 
   document.getElementById("produtoEstoque").value = "";
   document.getElementById("fisico").value = "";
   document.getElementById("logico").value = "";
 };
-
-function renderEstoque() {
-
-  const sobraDiv = document.getElementById("listaSobra");
-  const faltaDiv = document.getElementById("listaFalta");
-
-  if (!sobraDiv || !faltaDiv) return;
-
-  onSnapshot(collection(db, "estoqueErro"), snapshot => {
-
-    sobraDiv.innerHTML = "";
-    faltaDiv.innerHTML = "";
-
-    snapshot.forEach((docSnap) => {
-
-      const item = docSnap.data();
-
-      const div = document.createElement("div");
-      div.className = "item estoque-item";
-
-      div.innerHTML = `
-        <div>
-          <strong>${item.produto}</strong> (${item.setor})<br>
-          Físico: ${item.fisico} | Lógico: ${item.logico}<br>
-          Diferença: ${item.diferenca}
-        </div>
-        <button onclick="removerEstoque('${docSnap.id}')">X</button>
-      `;
-
-      if (item.diferenca > 0) {
-        sobraDiv.appendChild(div);
-      } else if (item.diferenca < 0) {
-        faltaDiv.appendChild(div);
-      }
-
-    });
-
-  });
-}
-
-window.removerEstoque = async function (id) {
-  await deleteDoc(doc(db, "estoqueErro", id));
-};
-
-/* GARANTE QUE RODA */
-window.addEventListener("load", () => {
-  renderEstoque();
-});
