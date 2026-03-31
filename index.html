@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Controle de Vencimentos</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="container">
+  <h2>Controle de Vencimentos</h2>
+
+  <input type="text" id="nome" placeholder="Produto">
+  <input type="text" id="marca" placeholder="Marca">
+  <input type="date" id="data">
+  <input type="number" id="quantidade" placeholder="Quantidade">
+
+  <select id="gestao">
+    <option value="nao">Sem markdown</option>
+    <option value="sim">Com markdown</option>
+  </select>
+
+  <button onclick="adicionar()">Adicionar</button>
+
+  <select id="filtroMarca">
+    <option value="">Todas as marcas</option>
+  </select>
+
+  <div id="lista"></div>
+</div>
+
+<script type="module" src="script.js"></script>
+
+</body>
+</html>

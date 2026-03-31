@@ -1,0 +1,63 @@
+body {
+  font-family: Arial;
+  background: #f5f5f5;
+  padding: 20px;
+}
+
+.container {
+  max-width: 700px;
+  margin: auto;
+}
+
+input, button, select {
+  padding: 10px;
+  margin: 5px;
+  width: calc(100% - 22px);
+}
+
+button {
+  background: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.item {
+  padding: 15px;
+  margin-top: 10px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f1f1f1;
+}
+
+.info {
+  flex: 1;
+}
+
+.nome {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.vencimento {
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-top: 5px;
+}
+
+.amarelo { background: #fff3cd; }
+.vermelho { background: #f8d7da; }
+.normal { background: #d4edda; }
+
+.excluir {
+  background: red;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
