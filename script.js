@@ -5,7 +5,7 @@ import {
 
 import { enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-/* CONFIG FIREBASE */
+/* CONFIG */
 const firebaseConfig = {
   apiKey: "SUA_KEY",
   authDomain: "SEU_DOMINIO",
@@ -15,15 +15,18 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-/* CACHE OFFLINE */
-enableIndexedDbPersistence(db).catch(() => {
-  console.log("Cache offline não ativado");
-});
+enableIndexedDbPersistence(db).catch(() => {});
 
-/* ADICIONAR */
+/* ========================= */
+/* VENCIMENTOS (INTACTO) */
+/* ========================= */
+
+let ultimoExcluido = null;
+let timeoutExclusao = null;
+
 window.adicionar = async function () {
   const nome = document.getElementById("nome").value.trim();
-  const marca = document.getElementById("marca").value.trim();
+  const marca = document.getElementById("marca").value;
   const data = document.getElementById("data").value;
   const quantidade = document.getElementById("quantidade").value;
   const gestao = document.getElementById("gestao").value;
@@ -43,29 +46,77 @@ window.adicionar = async function () {
   });
 
   document.getElementById("nome").value = "";
-  document.getElementById("marca").value = "";
   document.getElementById("data").value = "";
   document.getElementById("quantidade").value = "";
 };
 
-/* EXCLUIR TODOS DO PRODUTO */
+window.excluirItem = async function (id) {
+  const snapshot = await getDocs(collection(db, "produtos"));
+
+  let itemBackup = null;
+  snapshot.forEach(docSnap => {
+    if (docSnap.id === id) itemBackup = docSnap.data();
+  });
+
+  if (!itemBackup) return;
+
+  ultimoExcluido = { id, ...itemBackup };
+
+  await deleteDoc(doc(db, "produtos", id));
+
+  mostrarUndo();
+};
+
+window.desfazer = async function () {
+  if (!ultimoExcluido) return;
+
+  await addDoc(collection(db, "produtos"), {
+    ...ultimoExcluido,
+    criadoEm: new Date()
+  });
+
+  ultimoExcluido = null;
+  esconderUndo();
+};
+
+function mostrarUndo() {
+  let barra = document.getElementById("undoBar");
+
+  if (!barra) {
+    barra = document.createElement("div");
+    barra.id = "undoBar";
+    document.body.appendChild(barra);
+  }
+
+  barra.innerHTML = `Item excluído <button onclick="desfazer()">Desfazer</button>`;
+  barra.style.display = "flex";
+
+  clearTimeout(timeoutExclusao);
+  timeoutExclusao = setTimeout(() => {
+    ultimoExcluido = null;
+    esconderUndo();
+  }, 5000);
+}
+
+function esconderUndo() {
+  const barra = document.getElementById("undoBar");
+  if (barra) barra.style.display = "none";
+}
+
 window.excluirGrupo = async function (nome, marca) {
   const snapshot = await getDocs(collection(db, "produtos"));
 
   snapshot.forEach(async (docSnap) => {
     const item = docSnap.data();
-
     if (item.nome === nome && item.marca === marca) {
       await deleteDoc(doc(db, "produtos", docSnap.id));
     }
   });
 };
 
-/* COR VENCIMENTO */
 function calcularClasse(data) {
   const hoje = new Date();
   const venc = new Date(data);
-
   const diffMeses = (venc - hoje) / (1000 * 60 * 60 * 24 * 30);
 
   if (diffMeses <= 3) return "vermelho";
@@ -73,26 +124,24 @@ function calcularClasse(data) {
   return "normal";
 }
 
-/* LISTAGEM */
 const select = document.getElementById("filtroMarca");
-
 select.addEventListener("change", carregar);
 
 function carregar() {
   onSnapshot(collection(db, "produtos"), snapshot => {
+
     const lista = document.getElementById("lista");
     const filtro = select.value;
 
     lista.innerHTML = "";
 
-    let marcas = new Set();
+    let setores = new Set();
     let agrupados = {};
 
     snapshot.forEach(docSnap => {
       const item = docSnap.data();
 
-      if (item.marca) marcas.add(item.marca);
-
+      if (item.marca) setores.add(item.marca);
       if (filtro && item.marca !== filtro) return;
 
       const chave = item.nome + "_" + item.marca;
@@ -101,25 +150,25 @@ function carregar() {
         agrupados[chave] = {
           nome: item.nome,
           marca: item.marca,
-          gestao: item.gestao,
           itens: []
         };
       }
 
       agrupados[chave].itens.push({
+        id: docSnap.id,
         data: item.data,
-        quantidade: item.quantidade
+        quantidade: item.quantidade,
+        gestao: item.gestao
       });
     });
 
-    /* CORRIGIDO: NÃO PERDE MARCAS */
     const valorAtual = select.value;
-    select.innerHTML = '<option value="">Todas as marcas</option>';
+    select.innerHTML = '<option value="">Todos os setores</option>';
 
-    marcas.forEach(m => {
+    setores.forEach(s => {
       const option = document.createElement("option");
-      option.value = m;
-      option.textContent = m;
+      option.value = s;
+      option.textContent = s;
       select.appendChild(option);
     });
 
@@ -140,6 +189,10 @@ function carregar() {
         linhas += `
           <div class="vencimento ${classe}">
             ${i.data} → Qtd: ${i.quantidade}
+            <strong class="${i.gestao === 'sim' ? 'sim' : 'nao'}">
+              (${i.gestao === 'sim' ? 'Markdown: SIM' : 'Markdown: NÃO'})
+            </strong>
+            <button class="btn-mini" onclick="excluirItem('${i.id}')">🗑</button>
           </div>
         `;
       });
@@ -147,15 +200,7 @@ function carregar() {
       div.innerHTML = `
         <div class="info">
           <div class="nome">${produto.nome}</div>
-          <div class="marca">Marca: ${produto.marca || "-"}</div>
-
-          <div>
-            Markdown:
-            <strong class="${produto.gestao === 'sim' ? 'sim' : 'nao'}">
-              ${produto.gestao === 'sim' ? 'SIM' : 'NÃO'}
-            </strong>
-          </div>
-
+          <div class="marca">Setor: ${produto.marca}</div>
           ${linhas}
         </div>
 
@@ -164,8 +209,95 @@ function carregar() {
 
       lista.appendChild(div);
     });
+
   });
 }
 
-/* INICIAL */
 carregar();
+
+/* ========================= */
+/* ESTOQUE (CORRIGIDO) */
+/* ========================= */
+
+window.adicionarEstoque = function () {
+
+  const produtoInput = document.getElementById("produtoEstoque");
+  const setorInput = document.getElementById("setor");
+  const fisicoInput = document.getElementById("fisico");
+  const logicoInput = document.getElementById("logico");
+
+  if (!produtoInput || !setorInput || !fisicoInput || !logicoInput) {
+    console.log("Campos de estoque não encontrados");
+    return;
+  }
+
+  const produto = produtoInput.value.trim();
+  const setor = setorInput.value;
+  const fisico = Number(fisicoInput.value);
+  const logico = Number(logicoInput.value);
+
+  if (!produto || isNaN(fisico) || isNaN(logico)) {
+    alert("Preencha todos os campos do estoque");
+    return;
+  }
+
+  const diferenca = fisico - logico;
+
+  const item = { produto, setor, fisico, logico, diferenca };
+
+  const dados = JSON.parse(localStorage.getItem("estoqueErro")) || [];
+  dados.push(item);
+  localStorage.setItem("estoqueErro", JSON.stringify(dados));
+
+  renderEstoque();
+
+  produtoInput.value = "";
+  fisicoInput.value = "";
+  logicoInput.value = "";
+};
+
+function renderEstoque() {
+
+  const sobraDiv = document.getElementById("listaSobra");
+  const faltaDiv = document.getElementById("listaFalta");
+
+  if (!sobraDiv || !faltaDiv) return;
+
+  const dados = JSON.parse(localStorage.getItem("estoqueErro")) || [];
+
+  sobraDiv.innerHTML = "";
+  faltaDiv.innerHTML = "";
+
+  dados.forEach((item, index) => {
+
+    const div = document.createElement("div");
+    div.className = "item estoque-item";
+
+    div.innerHTML = `
+      <div>
+        <strong>${item.produto}</strong> (${item.setor})<br>
+        Físico: ${item.fisico} | Lógico: ${item.logico}<br>
+        Diferença: ${item.diferenca}
+      </div>
+      <button onclick="removerEstoque(${index})">X</button>
+    `;
+
+    if (item.diferenca > 0) {
+      sobraDiv.appendChild(div);
+    } else if (item.diferenca < 0) {
+      faltaDiv.appendChild(div);
+    }
+  });
+}
+
+window.removerEstoque = function (index) {
+  const dados = JSON.parse(localStorage.getItem("estoqueErro")) || [];
+  dados.splice(index, 1);
+  localStorage.setItem("estoqueErro", JSON.stringify(dados));
+  renderEstoque();
+};
+
+/* GARANTE QUE RODA DEPOIS DO HTML */
+window.addEventListener("load", () => {
+  renderEstoque();
+});

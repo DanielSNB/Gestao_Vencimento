@@ -2,32 +2,91 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Controle de Vencimentos</title>
+  <title>Controle de Vencimentos + Estoque</title>
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
+<!-- ========================= -->
+<!-- CONTROLE DE VENCIMENTOS -->
+<!-- ========================= -->
+
 <div class="container">
-  <h2>Controle de Vencimentos</h2>
+  
+  <h2>📦 Controle de Vencimentos</h2>
 
-  <input type="text" id="nome" placeholder="Produto">
-  <input type="text" id="marca" placeholder="Marca">
-  <input type="date" id="data">
-  <input type="number" id="quantidade" placeholder="Quantidade">
+  <div class="form">
+    
+    <input type="text" id="nome" placeholder="Produto">
 
-  <select id="gestao">
-    <option value="nao">Sem markdown</option>
-    <option value="sim">Com markdown</option>
-  </select>
+    <!-- SETOR (substitui marca, mas mantém ID) -->
+    <select id="marca">
+      <option value="suplementos">Suplementos</option>
+      <option value="medicamento">Medicamento</option>
+      <option value="antipulgas">Antipulgas</option>
+    </select>
 
-  <button onclick="adicionar()">Adicionar</button>
+    <input type="date" id="data">
+    <input type="number" id="quantidade" placeholder="Quantidade">
 
-  <select id="filtroMarca">
-    <option value="">Todas as marcas</option>
-  </select>
+    <select id="gestao">
+      <option value="nao">Sem markdown</option>
+      <option value="sim">Com markdown</option>
+    </select>
+
+    <button onclick="adicionar()">Adicionar</button>
+  </div>
+
+  <!-- FILTRO AGORA POR SETOR -->
+  <div class="filtro">
+    <select id="filtroMarca">
+      <option value="">Todos os setores</option>
+    </select>
+  </div>
 
   <div id="lista"></div>
+
+</div>
+
+<!-- ========================= -->
+<!-- CONTROLE DE ESTOQUE -->
+<!-- ========================= -->
+
+<div class="container estoque">
+
+  <h2>📊 Controle de Erro de Estoque</h2>
+
+  <div class="form">
+    
+    <input type="text" id="produtoEstoque" placeholder="Produto">
+
+    <select id="setor">
+      <option value="suplementos">Suplementos</option>
+      <option value="medicamento">Medicamento</option>
+      <option value="antipulgas">Antipulgas</option>
+    </select>
+
+    <input type="number" id="fisico" placeholder="Físico (loja)">
+    <input type="number" id="logico" placeholder="Lógico (coletor)">
+
+    <button onclick="adicionarEstoque()">Adicionar</button>
+  </div>
+
+  <div class="listas-estoque">
+    
+    <div>
+      <h3>🟢 Sobras</h3>
+      <div id="listaSobra"></div>
+    </div>
+
+    <div>
+      <h3>🔴 Faltas</h3>
+      <div id="listaFalta"></div>
+    </div>
+
+  </div>
+
 </div>
 
 <script type="module" src="script.js"></script>
